@@ -112,19 +112,28 @@
 
 
 
+
+
+
     </style>
 </head>
 <body>
 <div>
     <div id="root">
+        <h1>5 last questions</h1>
+        <a href="/admin/">(Admin)</a>
+        <br>
+        <br>
         {% if latest_question_list %}
-            <ul>
+        <ul>
             {% for question in latest_question_list %}
-                <li><a href="{% url 'polls:detail' question.id %}">{{ question.question_text }}</a> (Added: {{question.pub_date}})</li>
+            <li><a href="{% url 'polls:detail' question.id %}">{{ question.question_text }}</a> (Added:
+                {{question.pub_date}})
+            </li>
             {% endfor %}
-            </ul>
+        </ul>
         {% else %}
-            <p>No polls are available.</p>
+        <p>No polls are available.</p>
         {% endif %}
     </div>
 </div>
