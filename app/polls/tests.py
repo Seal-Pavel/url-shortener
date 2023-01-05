@@ -7,6 +7,15 @@ from django.urls import reverse
 from .models import Question
 
 
+def create_question(question_text='Question text.', days=0):
+    time = timezone.now() + datetime.timedelta(days=days)
+    return Question.objects.create(question_text=question_text, pub_date=time)
+
+
+def create_choice_for_question(question, choice_text='One of the choices'):
+    question.choice_set.create(choice_text=choice_text)
+
+
 class QuestionModelTests(TestCase):
 
     def test_was_published_recently_with_future_question(self):
@@ -35,11 +44,6 @@ class QuestionModelTests(TestCase):
         time = timezone.now() - datetime.timedelta(hours=23, minutes=59, seconds=59)
         recent_question = Question(pub_date=time)
         self.assertIs(recent_question.was_published_recently(), True)
-
-
-def create_question(question_text, days):
-    time = timezone.now() + datetime.timedelta(days=days)
-    return Question.objects.create(question_text=question_text, pub_date=time)
 
 
 class QuestionIndexViewTests(TestCase):
@@ -99,6 +103,12 @@ class QuestionIndexViewTests(TestCase):
             [question2, question1],
         )
 
+    def test_question_has_no_choice(self):
+        create_question()
+        response = self.client.get(reverse('polls:index'))
+        self.assertContains(response, "No polls are available.")
+        self.assertQuerysetEqual(response.context['latest_question_list'], [])
+
 
 class QuestionDetailViewTests(TestCase):
     def test_future_question(self):
@@ -113,13 +123,33 @@ class QuestionDetailViewTests(TestCase):
 
     def test_past_question(self):
         """
-        The detail view of a question with a pub_date in the past
-        displays the question's text.
+        The detail view of a question with a pub_date in the past displays the question's text.
         """
         past_question = create_question(question_text='Past Question.', days=-5)
+        print('-----------')
+        print(past_question.id)
+        print(past_question.question_text)
+        print(past_question.pub_date)
         url = reverse('polls:detail', args=(past_question.id,))
         response = self.client.get(url)
+        print('-----------')
+        print(response)
         self.assertContains(response, past_question.question_text)
+
+    def test_question_has_choice(self):
+        question = create_question()
+        create_choice_for_question(question)
+        create_choice_for_question(question)
+        url = reverse('polls:detail', args=(question.id,))
+        response = self.client.get(url)
+        for choice in question.choice_set.all():
+            self.assertContains(response, choice)
+
+    def test_question_has_no_choice(self):
+        question = create_question()
+        url = reverse('polls:detail', args=(question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
 
 class QuestionResultsViewTests(TestCase):
@@ -134,3 +164,9 @@ class QuestionResultsViewTests(TestCase):
         url = reverse('polls:results', args=(past_question.id,))
         response = self.client.get(url)
         self.assertContains(response, past_question.question_text)
+
+    def test_question_has_no_choice(self):
+        question = create_question()
+        url = reverse('polls:detail', args=(question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
