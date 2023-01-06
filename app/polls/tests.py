@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from django.test import TestCase
 from django.utils import timezone
@@ -14,7 +15,7 @@ def create_question(question_text='Question text?', days=0, hours=0):
 
 def create_choice_for_question(question, choice_text='One of the choices', q=2):
     for i in range(q):
-        question.choice_set.create(choice_text=f'{choice_text}{i + 1}')
+        question.choice_set.create(choice_text=f'{choice_text} {i + 1}.')
 
 
 class QuestionModelTests(TestCase):
@@ -159,6 +160,58 @@ class QuestionResultsViewTests(TestCase):
 
     def test_question_has_no_choice(self):
         question = create_question()
-        url = reverse('polls:detail', args=(question.id,))
+        url = reverse('polls:results', args=(question.id,))
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+    def test_question_has_choice(self):
+        question = create_question()
+        create_choice_for_question(question)
+        create_choice_for_question(question)
+        url = reverse('polls:results', args=(question.id,))
+        response = self.client.get(url)
+        for choice in question.choice_set.all():
+            self.assertContains(response, choice)
+
+
+class QuestionVoteViewTests(TestCase):
+    def test_future_question(self):
+        future_question = create_question(question_text='Future question.', days=5)
+        url = reverse('polls:vote', args=(future_question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_past_question(self):
+        past_question = create_question(question_text='Past Question.', days=-5)
+        create_choice_for_question(past_question)
+        url = reverse('polls:vote', args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, past_question.question_text)
+
+    def test_question_has_no_choice(self):
+        question = create_question()
+        url = reverse('polls:vote', args=(question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_question_has_choice(self):
+        question = create_question()
+        create_choice_for_question(question)
+        create_choice_for_question(question)
+        url = reverse('polls:vote', args=(question.id,))
+        response = self.client.get(url)
+        for choice in question.choice_set.all():
+            self.assertContains(response, choice)
+
+    def test_votes_for_choice_plus_1(self):
+        question = create_question()
+        create_choice_for_question(question, q=4)
+        choice_num = 0
+        choice_id = question.choice_set.all()[choice_num].id
+        self.assertEqual(question.choice_set.filter(pk=choice_id)[0].votes, 0)
+        self.assertQuerysetEqual(question.choice_set.filter(votes__gt=0), [])
+        url = reverse('polls:vote', args=(question.id,))
+        data = {'choice': choice_id}
+        response = self.client.post(url, data=data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(question.choice_set.filter(pk=choice_id)[0].votes, 1)

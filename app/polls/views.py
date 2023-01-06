@@ -28,9 +28,6 @@ class DetailView(generic.DetailView):
     template_name = 'polls/detail.html'
 
     def get_queryset(self):
-        """
-        Excludes any questions that aren't published yet.
-        """
         return Question.objects.filter(
             pub_date__lte=timezone.now(),
             choice__choice_text__isnull=False,
@@ -38,7 +35,11 @@ class DetailView(generic.DetailView):
 
 
 def vote(request, question_id):
-    question = get_object_or_404(Question, pk=question_id)
+    question_queryset = Question.objects.filter(
+        pub_date__lte=timezone.now(),
+        choice__choice_text__isnull=False,
+    ).distinct()
+    question = get_object_or_404(question_queryset, pk=question_id)
     try:
         selected_choice = question.choice_set.filter(pk=request.POST['choice'])
     except (KeyError, Choice.DoesNotExist):
